@@ -1,4 +1,5 @@
 name: Build darkGram APK
+
 on:
   push:
     branches: [ master ]
@@ -7,12 +8,15 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - uses: actions/setup-java@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -22,11 +26,12 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build with Gradle
-        run: ./gradlew assembleDebug --stacktrace
+        # Используем assembleAfatRelease, так как твой проект настроен на этот тип (flavor)
+        run: ./gradlew clean assembleAfatRelease --stacktrace --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: darkGram-debug
-          # Этот путь найдет любой APK файл, который создаст сборка
-          path: "**/build/outputs/apk/**/*.apk"
+          name: darkGram-release-apk
+          # Путь изменен, чтобы забирать только готовые релизные APK
+          path: TMessagesProj/build/outputs/apk/afat/release/*.apk
