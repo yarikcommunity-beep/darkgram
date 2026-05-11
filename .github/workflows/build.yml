@@ -8,7 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -22,16 +21,30 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
+      # ШАГ ДЛЯ ПЕРЕИМЕНОВАНИЯ ПРИЛОЖЕНИЯ
+      - name: Rename App to darkGram
+        run: |
+          sed -i 's/"AppNameAll">Telegram Beta/"AppNameAll">darkGram/g' TMessagesProj/src/main/res/values/strings.xml
+          sed -i 's/"AppName">Telegram/"AppName">darkGram/g' TMessagesProj/src/main/res/values/strings.xml
+
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > release.jks
+
       - name: Make gradlew executable
         run: chmod +x gradlew
 
       - name: Build with Gradle
-        # Используем assembleAfatRelease, так как твой проект настроен на этот тип (flavor)
-        run: ./gradlew clean assembleAfatRelease --stacktrace --no-daemon
+        run: >
+          ./gradlew clean assembleAfatRelease
+          -Pandroid.injected.signing.store.file=$(pwd)/release.jks
+          -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }}
+          -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }}
+          -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+          --stacktrace --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: darkGram-release-apk
-          # Путь изменен, чтобы забирать только готовые релизные APK
+          name: darkGram-release
           path: TMessagesProj/build/outputs/apk/afat/release/*.apk
