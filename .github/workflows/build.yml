@@ -8,11 +8,16 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    # Увеличиваем время ожидания, так как Telegram собирается долго
+    timeout-minutes: 120
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -27,24 +32,53 @@ jobs:
           sed -i 's/"AppNameAll">Telegram Beta/"AppNameAll">darkGram/g' TMessagesProj/src/main/res/values/strings.xml
           sed -i 's/"AppName">Telegram/"AppName">darkGram/g' TMessagesProj/src/main/res/values/strings.xml
 
+      # ПРОВЕРКА СЕКРЕТОВ И ДЕКОДИРОВАНИЕ КЛЮЧА
       - name: Decode Keystore
         run: |
+          if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "КРИТИЧЕСКАЯ ОШИБКА: Секрет KEYSTORE_BASE64 не найден в Settings -> Secrets!"
+            exit 1
+          fi
+          
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > release.jks
+          
+          if [ ! -s release.jks ]; then
+            echo "КРИТИЧЕСКАЯ ОШИБКА: Не удалось декодировать ключ или файл пуст!"
+            exit 1
+          fi
+          echo "Ключ успешно декодирован и готов к работе."
 
       - name: Make gradlew executable
         run: chmod +x gradlew
 
+      # ПОЛНАЯ СБОРКА РЕЛИЗА
       - name: Build with Gradle
-        run: >
-          ./gradlew clean assembleAfatRelease
-          -Pandroid.injected.signing.store.file=$(pwd)/release.jks
-          -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }}
-          -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }}
-          -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
-          --stacktrace --no-daemon
+        run: |
+          ./gradlew clean assembleAfatRelease \
+          -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/release.jks \
+          -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
+          -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
+          -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}" \
+          --stacktrace \
+          --info \
+          --no-daemon \
+          -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g"
 
+      # ЗАГРУЗКА ГОТОВОГО ФАЙЛА
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: darkGram-release
           path: TMessagesProj/build/outputs/apk/afat/release/*.apk
+
+      # ОЧИСТКА ПОСЛЕ СБОРКИ
+      - name: Post Set up JDK 17
+        if: always()
+        run: echo "Cleaning up JDK environment..."
+
+      - name: Post Checkout Repository
+        if: always()
+        run: |
+          rm -rf release.jks
+          echo "Sensitive data removed. Build finished."
