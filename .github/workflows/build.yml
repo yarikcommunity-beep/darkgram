@@ -52,6 +52,7 @@ jobs:
         run: chmod +x gradlew
 
       # ПОЛНАЯ СБОРКА РЕЛИЗА
+    # ПОЛНАЯ СБОРКА РЕЛИЗА
       - name: Build with Gradle
         run: |
           ./gradlew clean assembleAfatRelease \
@@ -59,10 +60,11 @@ jobs:
           -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
           -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
           -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}" \
+          -Pandroid.handler.max-workers=1 \
+          -Pandroid.jobs=1 \
           --stacktrace \
-          --info \
           --no-daemon \
-          -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g"
+          -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError"
 
       # ЗАГРУЗКА ГОТОВОГО ФАЙЛА
       - name: Upload APK
